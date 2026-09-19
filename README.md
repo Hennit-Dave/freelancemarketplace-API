@@ -1,6 +1,6 @@
 # Freelance Marketplace API
 
-A public read API built with Next.js 14 App Router, strict TypeScript, Prisma/PostgreSQL, Zod, and Upstash Redis. It exposes freelancers, clients, gigs, orders, and reviews, plus order creation. There is no landing page, admin panel, or consumer UI.
+A public read API built with Next.js 14 App Router, strict TypeScript, Prisma/PostgreSQL, Zod, and Upstash Redis. It exposes freelancers, clients, gigs, orders, and reviews, plus order creation. A single consumer page at `/consumer` lists gigs from the deployed API with a category filter and a next-page button; there is no landing page or admin panel.
 
 ## Setup
 
