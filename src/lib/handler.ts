@@ -9,6 +9,7 @@ export async function handle(request: Request, action: () => Promise<Response>):
   } catch (error) {
     if (error instanceof ApiError) return failure(error.status, error.code, error.message);
     if (error instanceof Prisma.PrismaClientKnownRequestError) {
+      console.error('Prisma request error:', { code: error.code, message: error.message });
       if (error.code === 'P2025') return failure(404, 'NOT_FOUND', 'Resource not found');
       if (error.code === 'P2003') return failure(422, 'VALIDATION_ERROR', 'gigId or clientId: referenced resource does not exist');
       if (error.code === 'P2002') return failure(409, 'CONFLICT', 'Resource already exists');
