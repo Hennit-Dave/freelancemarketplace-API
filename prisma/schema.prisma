@@ -1,0 +1,86 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+  directUrl = env("DIRECT_URL")
+}
+
+model Freelancer {
+  id              String   @id @default(cuid())
+  name            String
+  title           String
+  bio             String
+  skills          String[]
+  hourlyRateMinor Int
+  currency        String   @default("USD")
+  rating          Float    @default(0)
+  createdAt       DateTime @default(now())
+
+  gigs            Gig[]
+
+  @@index([rating])
+}
+
+model Client {
+  id        String   @id @default(cuid())
+  name      String
+  email     String   @unique
+  createdAt DateTime @default(now())
+
+  orders    Order[]
+}
+
+model Gig {
+  id           String   @id @default(cuid())
+  freelancerId String
+  freelancer   Freelancer @relation(fields: [freelancerId], references: [id])
+  title        String
+  description  String
+  category     String
+  priceMinor   Int
+  currency     String   @default("USD")
+  deliveryDays Int
+  createdAt    DateTime @default(now())
+
+  orders       Order[]
+
+  @@index([category])
+  @@index([priceMinor])
+}
+
+enum OrderStatus {
+  pending
+  in_progress
+  delivered
+  completed
+  cancelled
+}
+
+model Order {
+  id          String      @id @default(cuid())
+  gigId       String
+  gig         Gig         @relation(fields: [gigId], references: [id])
+  clientId    String
+  client      Client      @relation(fields: [clientId], references: [id])
+  status      OrderStatus @default(pending)
+  priceMinor  Int
+  currency    String      @default("USD")
+  createdAt   DateTime    @default(now())
+  completedAt DateTime?
+
+  review      Review?
+
+  @@index([status])
+}
+
+model Review {
+  id        String   @id @default(cuid())
+  orderId   String   @unique
+  order     Order    @relation(fields: [orderId], references: [id])
+  rating    Int
+  comment   String?
+  createdAt DateTime @default(now())
+}
