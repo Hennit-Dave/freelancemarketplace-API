@@ -11,7 +11,10 @@ const envSchema = z.object({
 });
 export async function rateLimit(request: Request): Promise<Response | undefined> {
   const env = envSchema.safeParse(process.env);
-  if (!env.success) throw new ApiError(503, 'SERVICE_UNAVAILABLE', 'Rate limiter is not configured');
+  if (!env.success) {
+    console.error('Rate limiter config invalid:', env.error.issues);
+    throw new ApiError(503, 'SERVICE_UNAVAILABLE', 'Rate limiter is not configured');
+  }
   limiter ??= new Ratelimit({
     redis: new Redis({ url: env.data.UPSTASH_REDIS_REST_URL, token: env.data.UPSTASH_REDIS_REST_TOKEN }),
     limiter: Ratelimit.slidingWindow(config.rateLimit.requests, config.rateLimit.window),
