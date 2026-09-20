@@ -555,6 +555,88 @@ Before publishing an API deployment, run `npm run deploy:prepare` with the targe
 
 Deploy with all required environment variables, confirm trusted client-IP handling, and smoke-test the deployed API. The `/consumer` page must remain a list, a filter control, and a next-page button, using the deployed HTTPS API URL during development and testing.
 
+## Evidence from the live deployment
+
+Captured on 2026-09-20 against the production deployment. The terminal output below is real text, not screenshots.
+
+- Live API: https://freelancemarketplaceapi.vercel.app/api/v1/gigs
+- Consumer page: https://freelancemarketplaceapi.vercel.app/consumer
+
+### Paginated response from the live API
+
+```sh
+curl -sS "https://freelancemarketplaceapi.vercel.app/api/v1/gigs?category=design&sort=priceMinor&order=asc&limit=2&offset=0"
+```
+
+Result (HTTP 200; the JSON is reformatted for readability):
+
+```json
+{
+  "data": [
+    {
+      "id": "cmu8dnz5500rlad0tfrjznux7",
+      "freelancerId": "cmu8dnqx80038ad0tu9hqzj4r",
+      "title": "Practical Gold Towels",
+      "description": "Spero nemo at aedificium. Ars audentia volutabrum sunt casso officiis explicabo tutamen suspendo. Beneficium rerum adhaero aegrotatio summisse acidus nisi tunc crastinus.\nSummopere vetus sunt. Calculus accendo suasoria callide una deleniti excepturi. Tergum sed vigilo vomito vindico tredecim sufficio somnus amet.",
+      "category": "design",
+      "priceMinor": 2557,
+      "currency": "USD",
+      "deliveryDays": 5,
+      "createdAt": "2026-09-19T12:42:37.530Z"
+    },
+    {
+      "id": "cmu8dnuqf00atad0t27ro9qwa",
+      "freelancerId": "cmu8dnp7v000bad0t86j0uv4b",
+      "title": "Practical Marble Shoes",
+      "description": "Studio explicabo cras. Quas vallum derelinquo tredecim cuius. Aduro admoneo crastinus.\nSupellex talus admitto bos certus. Arbor appello villa thymum attollo cum constans. Dolore antiquus tactus crux celebrer coruscus deripio conicio carbo.",
+      "category": "design",
+      "priceMinor": 3878,
+      "currency": "USD",
+      "deliveryDays": 24,
+      "createdAt": "2026-09-19T12:42:37.528Z"
+    }
+  ],
+  "meta": {
+    "total": 67,
+    "limit": 2,
+    "offset": 0,
+    "hasMore": true
+  }
+}
+```
+
+### The 429 response
+
+This capture comes from a local copy of the API using the live Upstash database, not from the live URL. It sent 140 parallel requests from one fixed test IP in the documentation range (`203.0.113.80`, supplied through `x-forwarded-for`). 101 succeeded and 39 were rejected. The cutoff is approximate because Upstash uses a sliding window. A rejected response looked like this:
+
+```http
+HTTP/1.1 429 Too Many Requests
+content-type: application/json
+retry-after: 1
+
+{"error":{"code":"RATE_LIMITED","message":"Too many requests"}}
+```
+
+It cannot be reproduced against the live URL from a network whose outbound IP rotates, because each request is then counted against a different IP.
+
+### The seed script
+
+The seed script is [prisma/seed.ts](prisma/seed.ts) and is run with `npm run db:seed`. Running it against the live database, which is already seeded, printed:
+
+```text
+Seed skipped: 150 freelancers already exist.
+```
+
+Record counts on the live API, from `meta.total` of each list endpoint:
+
+| Resource | Records |
+| --- | --- |
+| freelancers | 150 |
+| clients | 200 |
+| gigs | 372 |
+| orders | 400 |
+| reviews | 65 |
+
 ## Design decisions
 
 ### Why these five resources?
