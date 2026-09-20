@@ -631,9 +631,9 @@ The limit only shows up for a caller whose outbound IP stays fixed. From a netwo
 
 ### The consumer page
 
-The `/consumer` page at https://freelancemarketplaceapi.vercel.app/consumer lists gigs from the live API, with the category dropdown open:
+The `/consumer` page at https://freelancemarketplaceapi.vercel.app/consumer lists gigs from the live API, with the category dropdown open. The address bar shows the deployed URL:
 
-![The consumer page listing gigs from the live API with the category dropdown open](docs/consumer.png)
+![The consumer page on the live URL listing gigs, with the category dropdown open](docs/consumer.png)
 
 ### The seed script
 
