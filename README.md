@@ -27,10 +27,10 @@ All supported endpoints are versioned under `/api/v1`. Reads require no authenti
 Set the base URL for the curl examples to your deployed API origin:
 
 ```sh
-export API_BASE_URL="https://your-deployed-api.example.com"
+export API_BASE_URL="https://freelancemarketplaceapi.vercel.app"
 ```
 
-This is a placeholder, not an existing deployment. Replace it with the real HTTPS origin, without a trailing slash. Consumer development and testing must target the deployed URL. Local API development and handler testing are separate from that requirement.
+This is the live Vercel deployment; use your own origin without a trailing slash if you deploy elsewhere. The `/consumer` page calls this URL directly. Because the API sends no CORS headers, the page works from the deployed origin but not from `localhost`. Local API development and handler testing are separate from that.
 
 The examples below are illustrative, not a dump of the seeded database. Replace example IDs with IDs returned by your API. Each response demonstrates a matching one-record dataset; actual IDs, totals, timestamps, and values will differ. The order and review examples illustrate their respective resource shapes independently.
 
@@ -549,11 +549,11 @@ The following HTTP cases were also checked against a local API using live Neon a
 | `GET /api/v1/gigs/not-a-valid-id` | 400 `BAD_REQUEST`. |
 | `POST /api/v1/orders` with only a valid-format `gigId` | 422 `VALIDATION_ERROR`, naming `clientId`. |
 
-A separate 101-request burst through the shared handler, using live Upstash and an isolated test key, produced 100 successes and one 429 with `Retry-After`. This does not verify a deployment's trusted proxy configuration.
+A separate burst of 110 requests to a local API using live Upstash and a fixed test IP in the documentation range (`203.0.113.77`, via `x-forwarded-for`) produced 100 successes and 10 responses of 429 with `Retry-After`. This does not verify a deployment's trusted proxy configuration: Vercel overwrites `x-forwarded-for`, and a caller whose outbound IP rotates (as with some shared egress pools) is spread across many buckets, so its traffic can exceed 100 requests per minute without hitting the limit.
 
 Before publishing an API deployment, run `npm run deploy:prepare` with the target environment configured. This applies migrations and seeds the database. Check the output and verify record counts before publishing. The seed skips whenever any freelancer exists, so investigate a partially populated database rather than assuming a skipped run means every table is complete. The seed script is unchanged.
 
-Deploy with all required environment variables, confirm trusted client-IP handling, and smoke-test the deployed API. A future consumer must remain a list, a filter control, and a next-page button, using the deployed HTTPS API URL during development and testing.
+Deploy with all required environment variables, confirm trusted client-IP handling, and smoke-test the deployed API. The `/consumer` page must remain a list, a filter control, and a next-page button, using the deployed HTTPS API URL during development and testing.
 
 ## Design decisions
 
