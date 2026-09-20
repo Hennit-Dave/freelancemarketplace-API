@@ -557,12 +557,18 @@ Deploy with all required environment variables, confirm trusted client-IP handli
 
 ## Evidence from the live deployment
 
-Captured on 2026-09-20 against the production deployment. The terminal output below is real text, not screenshots.
+Screenshots were taken on 2026-09-19 and the text captures on 2026-09-20, all against the production deployment.
 
 - Live API: https://freelancemarketplaceapi.vercel.app/api/v1/gigs
 - Consumer page: https://freelancemarketplaceapi.vercel.app/consumer
 
 ### Paginated response from the live API
+
+Terminal screenshot of `curl` against the live URL, showing `meta.total: 372`, `limit: 5`, `offset: 0` and `hasMore: true`:
+
+![curl against the live gigs endpoint returning a paginated response](docs/live-curl-paginated.png)
+
+A text capture of a filtered, sorted request:
 
 ```sh
 curl -sS "https://freelancemarketplaceapi.vercel.app/api/v1/gigs?category=design&sort=priceMinor&order=asc&limit=2&offset=0"
@@ -607,7 +613,11 @@ Result (HTTP 200; the JSON is reformatted for readability):
 
 ### The 429 response
 
-This capture comes from a local copy of the API using the live Upstash database, not from the live URL. It sent 140 parallel requests from one fixed test IP in the documentation range (`203.0.113.80`, supplied through `x-forwarded-for`). 101 succeeded and 39 were rejected. The cutoff is approximate because Upstash uses a sliding window. A rejected response looked like this:
+Screenshot of 105 parallel requests to the live URL from a machine with a stable IP. The tally at the top shows 100 responses of `200` and 5 of `429`:
+
+![Burst of 105 requests to the live API: 100 returned 200 and 5 returned 429](docs/rate-limit-429.png)
+
+The exact rejected response, captured from a local copy of the API using the live Upstash database, is below. It sent 140 parallel requests from one fixed test IP in the documentation range (`203.0.113.80`, supplied through `x-forwarded-for`). 101 succeeded and 39 were rejected. The cutoff is approximate because Upstash uses a sliding window. A rejected response looked like this:
 
 ```http
 HTTP/1.1 429 Too Many Requests
@@ -617,7 +627,13 @@ retry-after: 1
 {"error":{"code":"RATE_LIMITED","message":"Too many requests"}}
 ```
 
-It cannot be reproduced against the live URL from a network whose outbound IP rotates, because each request is then counted against a different IP.
+The limit only shows up for a caller whose outbound IP stays fixed. From a network whose outbound IP rotates, each request is counted against a different IP and none are rejected.
+
+### The consumer page
+
+The `/consumer` page at https://freelancemarketplaceapi.vercel.app/consumer lists gigs from the live API, with the category dropdown open:
+
+![The consumer page listing gigs from the live API with the category dropdown open](docs/consumer.png)
 
 ### The seed script
 
