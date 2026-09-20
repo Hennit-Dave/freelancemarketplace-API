@@ -25,7 +25,6 @@ export async function rateLimit(request: Request): Promise<Response | undefined>
   const ip = z.string().ip().safeParse(candidate);
   // Requests without a valid proxy IP share a conservative bucket.
   try {
-    console.log('rate-limit key:', ip.success ? ip.data : 'unknown');
     const result = await limiter.limit(ip.success ? ip.data : 'unknown');
     await result.pending;
     if (!result.success) return failure(429, 'RATE_LIMITED', 'Too many requests', {
