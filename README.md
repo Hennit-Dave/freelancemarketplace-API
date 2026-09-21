@@ -613,9 +613,9 @@ Result (HTTP 200; the JSON is reformatted for readability):
 
 ### The 429 response
 
-Screenshot of 105 parallel requests to the live URL from a machine with a stable IP. The tally at the top shows 100 responses of `200` and 5 of `429`:
+Screenshot of 120 parallel requests to the live URL from a machine with a stable IP, taken on 2026-09-21. The tally shows 100 responses of `200` and 20 of `429`. The next request was rejected with `HTTP/2 429`, a `retry-after: 25` header (seconds until the caller may retry) and the JSON error body:
 
-![Burst of 105 requests to the live API: 100 returned 200 and 5 returned 429](docs/rate-limit-429.png)
+![Burst of 120 requests to the live API: 100 returned 200 and 20 returned 429, then a rejected request showing HTTP 429, retry-after and the error body](docs/rate-limit-429.png)
 
 The exact rejected response, captured from a local copy of the API using the live Upstash database, is below. It sent 140 parallel requests from one fixed test IP in the documentation range (`203.0.113.80`, supplied through `x-forwarded-for`). 101 succeeded and 39 were rejected. The cutoff is approximate because Upstash uses a sliding window. A rejected response looked like this:
 
