@@ -25,7 +25,14 @@ export async function listResource(resource: Resource, input: Record<string, str
     }
     case 'gigs': {
       const q = parse(querySchemas.gigs, input);
-      const where: Prisma.GigWhereInput = { category: q.category, priceMinor: { gte: q.minPrice, lte: q.maxPrice } };
+      const where: Prisma.GigWhereInput = {
+        category: q.category,
+        priceMinor: { gte: q.minPrice, lte: q.maxPrice },
+        OR: q.search === undefined ? undefined : [
+          { title: { contains: q.search, mode: 'insensitive' } },
+          { description: { contains: q.search, mode: 'insensitive' } },
+        ],
+      };
       const [data, total] = await prisma.$transaction([
         prisma.gig.findMany({ where, take: q.limit, skip: q.offset, orderBy: [{ [q.sort]: q.order }, { id: 'asc' }] }),
         prisma.gig.count({ where }),

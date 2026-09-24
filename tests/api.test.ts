@@ -92,3 +92,48 @@ test('rate limiter fails closed when configuration is missing', async () => {
     process.env = original;
   }
 });
+async function listGigs(input: Record<string, string>, rows: unknown[], total: number) {
+  const find = replaceMethod(prisma.gig, 'findMany', (_args: Prisma.GigFindManyArgs) => Promise.resolve(rows));
+  const count = replaceMethod(prisma.gig, 'count', (_args: Prisma.GigCountArgs) => Promise.resolve(total));
+  const transaction = replaceMethod(prisma, '$transaction', async (operations: Promise<unknown>[]) => Promise.all(operations));
+  try {
+    const response = await listResource('gigs', input);
+    return {
+      body: await response.json(),
+      findWhere: find.replacement.mock.calls[0].arguments[0]?.where,
+      countWhere: count.replacement.mock.calls[0].arguments[0]?.where,
+    };
+  } finally { find.restore(); count.restore(); transaction.restore(); }
+}
+const searchClause = (term: string) => [
+  { title: { contains: term, mode: 'insensitive' } },
+  { description: { contains: term, mode: 'insensitive' } },
+];
+test('gig search trims the term and matches title or description case-insensitively', async () => {
+  const { body, findWhere, countWhere } = await listGigs({ search: '  Logo  ' }, [{ id: gigId, title: 'Minimal logo design' }], 1);
+  assert.deepEqual(findWhere?.OR, searchClause('Logo'));
+  assert.deepEqual(countWhere, findWhere);
+  assert.equal(body.data.length, 1);
+  assert.deepEqual(body.meta, { total: 1, limit: 20, offset: 0, hasMore: false });
+});
+test('gig search with no matches returns an empty page, not an error', async () => {
+  const { body, findWhere } = await listGigs({ search: 'zzz-no-such-gig' }, [], 0);
+  assert.deepEqual(findWhere?.OR, searchClause('zzz-no-such-gig'));
+  assert.deepEqual(body, { data: [], meta: { total: 0, limit: 20, offset: 0, hasMore: false } });
+});
+test('gig search combines with existing filters using AND', async () => {
+  const { findWhere, countWhere } = await listGigs({ search: 'logo', category: 'design', minPrice: '1000', maxPrice: '5000' }, [{ id: gigId }], 1);
+  assert.equal(findWhere?.category, 'design');
+  assert.deepEqual(findWhere?.priceMinor, { gte: 1000, lte: 5000 });
+  assert.deepEqual(findWhere?.OR, searchClause('logo'));
+  assert.equal(findWhere?.AND, undefined);
+  assert.deepEqual(countWhere, findWhere);
+});
+test('gig search over 100 characters after trimming is rejected with 400 BAD_REQUEST', async () => {
+  const limit = 'a'.repeat(100);
+  assert.equal(parse(querySchemas.gigs, { search: `  ${limit}  ` }).search, limit);
+  for (const search of [`${limit}a`, `  ${limit}a  `]) {
+    assert.throws(() => parse(querySchemas.gigs, { search }), (e: unknown) => e instanceof ApiError && e.status === 400 && e.code === 'BAD_REQUEST' && e.message.startsWith('search:'));
+    await assert.rejects(listResource('gigs', { search }), (e: unknown) => e instanceof ApiError && e.status === 400);
+  }
+});
