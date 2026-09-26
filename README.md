@@ -230,7 +230,7 @@ List gigs. No request body.
 | `sort` | enum | `createdAt` | One of createdAt, title, priceMinor, deliveryDays. |
 | `order` | enum | `asc` | asc or desc. |
 | `category` | string | `omitted` | Exact, case-sensitive match; trimmed, 1–200 characters. |
-| `search` | string | `omitted` | Case-insensitive substring match against `title` or `description`; trimmed, at most 100 characters after trimming (longer returns 400). Combined with other filters using AND. An empty or whitespace-only value is not rejected and currently matches every gig. |
+| `search` | string | `omitted` | Case-insensitive substring match against `title` or `description`; trimmed, at most 100 characters after trimming (longer returns 400). Combined with other filters using AND. Empty or whitespace-only values return 400. `%`, `_` and `\` are matched literally. |
 | `minPrice` | integer | `omitted` | Inclusive minimum priceMinor, 0–2,147,483,647. |
 | `maxPrice` | integer | `omitted` | Inclusive maximum priceMinor, 0–2,147,483,647; must be ≥ minPrice when both are supplied. |
 

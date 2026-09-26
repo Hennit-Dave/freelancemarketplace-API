@@ -137,3 +137,16 @@ test('gig search over 100 characters after trimming is rejected with 400 BAD_REQ
     await assert.rejects(listResource('gigs', { search }), (e: unknown) => e instanceof ApiError && e.status === 400);
   }
 });
+test('gig search that is empty or whitespace-only is rejected with 400 BAD_REQUEST', async () => {
+  for (const search of ['', '   ']) {
+    assert.throws(() => parse(querySchemas.gigs, { search }), (e: unknown) => e instanceof ApiError && e.status === 400 && e.code === 'BAD_REQUEST' && e.message.startsWith('search:'));
+    await assert.rejects(listResource('gigs', { search }), (e: unknown) => e instanceof ApiError && e.status === 400 && e.code === 'BAD_REQUEST');
+  }
+});
+test('gig search escapes LIKE wildcards so they match literally', async () => {
+  const { findWhere, countWhere } = await listGigs({ search: '100%' }, [], 0);
+  assert.deepEqual(findWhere?.OR, searchClause('100\\%'));
+  assert.deepEqual(countWhere, findWhere);
+  const { findWhere: mixed } = await listGigs({ search: 'a_b\\c' }, [], 0);
+  assert.deepEqual(mixed?.OR, searchClause('a\\_b\\\\c'));
+});

@@ -25,12 +25,13 @@ export async function listResource(resource: Resource, input: Record<string, str
     }
     case 'gigs': {
       const q = parse(querySchemas.gigs, input);
+      const term = q.search?.replace(/[\\%_]/g, '\\$&');
       const where: Prisma.GigWhereInput = {
         category: q.category,
         priceMinor: { gte: q.minPrice, lte: q.maxPrice },
-        OR: q.search === undefined ? undefined : [
-          { title: { contains: q.search, mode: 'insensitive' } },
-          { description: { contains: q.search, mode: 'insensitive' } },
+        OR: term === undefined ? undefined : [
+          { title: { contains: term, mode: 'insensitive' } },
+          { description: { contains: term, mode: 'insensitive' } },
         ],
       };
       const [data, total] = await prisma.$transaction([
