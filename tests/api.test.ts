@@ -92,3 +92,94 @@ test('rate limiter fails closed when configuration is missing', async () => {
     process.env = original;
   }
 });
+async function listGigs(input: Record<string, string>, rows: unknown[], total: number) {
+  const find = replaceMethod(prisma.gig, 'findMany', (_args: Prisma.GigFindManyArgs) => Promise.resolve(rows));
+  const count = replaceMethod(prisma.gig, 'count', (_args: Prisma.GigCountArgs) => Promise.resolve(total));
+  const transaction = replaceMethod(prisma, '$transaction', async (operations: Promise<unknown>[]) => Promise.all(operations));
+  try {
+    const response = await listResource('gigs', input);
+    return {
+      body: await response.json(),
+      findWhere: find.replacement.mock.calls[0].arguments[0]?.where,
+      countWhere: count.replacement.mock.calls[0].arguments[0]?.where,
+    };
+  } finally { find.restore(); count.restore(); transaction.restore(); }
+}
+const searchClause = (term: string) => [
+  { title: { contains: term, mode: 'insensitive' } },
+  { description: { contains: term, mode: 'insensitive' } },
+];
+test('gig search trims the term and matches title or description case-insensitively', async () => {
+  const { body, findWhere, countWhere } = await listGigs({ search: '  Logo  ' }, [{ id: gigId, title: 'Minimal logo design' }], 1);
+  assert.deepEqual(findWhere?.OR, searchClause('Logo'));
+  assert.deepEqual(countWhere, findWhere);
+  assert.equal(body.data.length, 1);
+  assert.deepEqual(body.meta, { total: 1, limit: 20, offset: 0, hasMore: false });
+});
+test('gig search with no matches returns an empty page, not an error', async () => {
+  const { body, findWhere } = await listGigs({ search: 'zzz-no-such-gig' }, [], 0);
+  assert.deepEqual(findWhere?.OR, searchClause('zzz-no-such-gig'));
+  assert.deepEqual(body, { data: [], meta: { total: 0, limit: 20, offset: 0, hasMore: false } });
+});
+test('gig search combines with existing filters using AND', async () => {
+  const { findWhere, countWhere } = await listGigs({ search: 'logo', category: 'design', minPrice: '1000', maxPrice: '5000' }, [{ id: gigId }], 1);
+  assert.equal(findWhere?.category, 'design');
+  assert.deepEqual(findWhere?.priceMinor, { gte: 1000, lte: 5000 });
+  assert.deepEqual(findWhere?.OR, searchClause('logo'));
+  assert.equal(findWhere?.AND, undefined);
+  assert.deepEqual(countWhere, findWhere);
+});
+test('gig search over 100 characters after trimming is rejected with 400 BAD_REQUEST', async () => {
+  const limit = 'a'.repeat(100);
+  assert.equal(parse(querySchemas.gigs, { search: `  ${limit}  ` }).search, limit);
+  for (const search of [`${limit}a`, `  ${limit}a  `]) {
+    assert.throws(() => parse(querySchemas.gigs, { search }), (e: unknown) => e instanceof ApiError && e.status === 400 && e.code === 'BAD_REQUEST' && e.message.startsWith('search:'));
+    await assert.rejects(listResource('gigs', { search }), (e: unknown) => e instanceof ApiError && e.status === 400);
+  }
+});
+test('gig search that is empty or whitespace-only is rejected with 400 BAD_REQUEST', async () => {
+  for (const search of ['', '   ']) {
+    assert.throws(() => parse(querySchemas.gigs, { search }), (e: unknown) => e instanceof ApiError && e.status === 400 && e.code === 'BAD_REQUEST' && e.message.startsWith('search:'));
+    await assert.rejects(listResource('gigs', { search }), (e: unknown) => e instanceof ApiError && e.status === 400 && e.code === 'BAD_REQUEST');
+  }
+});
+test('gig search escapes LIKE wildcards so they match literally', async () => {
+  const { findWhere, countWhere } = await listGigs({ search: '100%' }, [], 0);
+  assert.deepEqual(findWhere?.OR, searchClause('100\\%'));
+  assert.deepEqual(countWhere, findWhere);
+  const { findWhere: mixed } = await listGigs({ search: 'a_b\\c' }, [], 0);
+  assert.deepEqual(mixed?.OR, searchClause('a\\_b\\\\c'));
+});
+test('control characters in search or category are rejected with 400 BAD_REQUEST before reaching Prisma', async () => {
+  const find = replaceMethod(prisma.gig, 'findMany', () => Promise.resolve([]));
+  const count = replaceMethod(prisma.gig, 'count', () => Promise.resolve(0));
+  try {
+    for (const search of ['\u0000', 'abc\u0000def']) {
+      assert.throws(() => parse(querySchemas.gigs, { search }), (e: unknown) => e instanceof ApiError && e.status === 400 && e.code === 'BAD_REQUEST' && e.message.startsWith('search:'));
+      await assert.rejects(listResource('gigs', { search }), (e: unknown) => e instanceof ApiError && e.status === 400 && e.code === 'BAD_REQUEST');
+    }
+    assert.throws(() => parse(querySchemas.gigs, { category: '\u0000' }), (e: unknown) => e instanceof ApiError && e.status === 400 && e.code === 'BAD_REQUEST' && e.message.startsWith('category:'));
+    await assert.rejects(listResource('gigs', { category: '\u0000' }), (e: unknown) => e instanceof ApiError && e.status === 400 && e.code === 'BAD_REQUEST');
+    assert.equal(find.replacement.mock.calls.length, 0);
+    assert.equal(count.replacement.mock.calls.length, 0);
+  } finally { find.restore(); count.restore(); }
+});
+test('control characters in skill or name are rejected with 400 BAD_REQUEST before reaching Prisma', async () => {
+  const freelancerFind = replaceMethod(prisma.freelancer, 'findMany', () => Promise.resolve([]));
+  const freelancerCount = replaceMethod(prisma.freelancer, 'count', () => Promise.resolve(0));
+  const clientFind = replaceMethod(prisma.client, 'findMany', () => Promise.resolve([]));
+  const clientCount = replaceMethod(prisma.client, 'count', () => Promise.resolve(0));
+  try {
+    assert.throws(() => parse(querySchemas.freelancers, { skill: '\u0000' }), (e: unknown) => e instanceof ApiError && e.status === 400 && e.code === 'BAD_REQUEST' && e.message.startsWith('skill:'));
+    await assert.rejects(listResource('freelancers', { skill: '\u0000' }), (e: unknown) => e instanceof ApiError && e.status === 400 && e.code === 'BAD_REQUEST');
+    assert.throws(() => parse(querySchemas.clients, { name: 'abc\u0000def' }), (e: unknown) => e instanceof ApiError && e.status === 400 && e.code === 'BAD_REQUEST' && e.message.startsWith('name:'));
+    await assert.rejects(listResource('clients', { name: '\u0000' }), (e: unknown) => e instanceof ApiError && e.status === 400 && e.code === 'BAD_REQUEST');
+    assert.equal(freelancerFind.replacement.mock.calls.length, 0);
+    assert.equal(freelancerCount.replacement.mock.calls.length, 0);
+    assert.equal(clientFind.replacement.mock.calls.length, 0);
+    assert.equal(clientCount.replacement.mock.calls.length, 0);
+  } finally {
+    freelancerFind.restore(); freelancerCount.restore();
+    clientFind.restore(); clientCount.restore();
+  }
+});

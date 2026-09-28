@@ -79,7 +79,7 @@ List freelancers. No request body.
 | `offset` | integer | `0` | 0–2,147,483,647; negative values return 400. |
 | `sort` | enum | `createdAt` | One of createdAt, name, rating, hourlyRateMinor. |
 | `order` | enum | `asc` | asc or desc. |
-| `skill` | string | `omitted` | Exact, case-sensitive membership in skills; trimmed, 1–200 characters. |
+| `skill` | string | `omitted` | Exact, case-sensitive membership in skills; trimmed, 1–200 characters. Control characters (e.g. NUL) return 400. |
 | `minRating` | number | `omitted` | Inclusive minimum rating, 0–5; unsigned decimal notation (for example 4.5). |
 
 ```sh
@@ -162,7 +162,7 @@ List clients. No request body.
 | `offset` | integer | `0` | 0–2,147,483,647; negative values return 400. |
 | `sort` | enum | `createdAt` | One of createdAt, name. |
 | `order` | enum | `asc` | asc or desc. |
-| `name` | string | `omitted` | Case-insensitive substring match; trimmed, 1–200 characters. |
+| `name` | string | `omitted` | Case-insensitive substring match; trimmed, 1–200 characters. Control characters (e.g. NUL) return 400. |
 | `email` | string (email) | `omitted` | Exact email match; must be a valid email address. |
 
 ```sh
@@ -229,7 +229,8 @@ List gigs. No request body.
 | `offset` | integer | `0` | 0–2,147,483,647; negative values return 400. |
 | `sort` | enum | `createdAt` | One of createdAt, title, priceMinor, deliveryDays. |
 | `order` | enum | `asc` | asc or desc. |
-| `category` | string | `omitted` | Exact, case-sensitive match; trimmed, 1–200 characters. |
+| `category` | string | `omitted` | Exact, case-sensitive match; trimmed, 1–200 characters. Control characters (e.g. NUL) return 400. |
+| `search` | string | `omitted` | Case-insensitive substring match against `title` or `description`; trimmed, at most 100 characters after trimming (longer returns 400). Combined with other filters using AND. Empty or whitespace-only values return 400. `%`, `_` and `\` are matched literally. Control characters return 400. |
 | `minPrice` | integer | `omitted` | Inclusive minimum priceMinor, 0–2,147,483,647. |
 | `maxPrice` | integer | `omitted` | Inclusive maximum priceMinor, 0–2,147,483,647; must be ≥ minPrice when both are supplied. |
 
