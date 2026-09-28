@@ -164,3 +164,22 @@ test('control characters in search or category are rejected with 400 BAD_REQUEST
     assert.equal(count.replacement.mock.calls.length, 0);
   } finally { find.restore(); count.restore(); }
 });
+test('control characters in skill or name are rejected with 400 BAD_REQUEST before reaching Prisma', async () => {
+  const freelancerFind = replaceMethod(prisma.freelancer, 'findMany', () => Promise.resolve([]));
+  const freelancerCount = replaceMethod(prisma.freelancer, 'count', () => Promise.resolve(0));
+  const clientFind = replaceMethod(prisma.client, 'findMany', () => Promise.resolve([]));
+  const clientCount = replaceMethod(prisma.client, 'count', () => Promise.resolve(0));
+  try {
+    assert.throws(() => parse(querySchemas.freelancers, { skill: '\u0000' }), (e: unknown) => e instanceof ApiError && e.status === 400 && e.code === 'BAD_REQUEST' && e.message.startsWith('skill:'));
+    await assert.rejects(listResource('freelancers', { skill: '\u0000' }), (e: unknown) => e instanceof ApiError && e.status === 400 && e.code === 'BAD_REQUEST');
+    assert.throws(() => parse(querySchemas.clients, { name: 'abc\u0000def' }), (e: unknown) => e instanceof ApiError && e.status === 400 && e.code === 'BAD_REQUEST' && e.message.startsWith('name:'));
+    await assert.rejects(listResource('clients', { name: '\u0000' }), (e: unknown) => e instanceof ApiError && e.status === 400 && e.code === 'BAD_REQUEST');
+    assert.equal(freelancerFind.replacement.mock.calls.length, 0);
+    assert.equal(freelancerCount.replacement.mock.calls.length, 0);
+    assert.equal(clientFind.replacement.mock.calls.length, 0);
+    assert.equal(clientCount.replacement.mock.calls.length, 0);
+  } finally {
+    freelancerFind.restore(); freelancerCount.restore();
+    clientFind.restore(); clientCount.restore();
+  }
+});
