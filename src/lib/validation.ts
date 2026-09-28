@@ -6,7 +6,8 @@ export const resourceSchema = z.enum(['freelancers', 'clients', 'gigs', 'orders'
 export type Resource = z.infer<typeof resourceSchema>;
 export const idSchema = z.string().cuid('id must be a valid cuid');
 const integer = z.string().regex(/^\d+$/, 'must be a non-negative integer').transform(Number).pipe(z.number().int().safe());
-const text = z.string().trim().min(1).max(200);
+const noControlChars = /^[^\u0000-\u001F\u007F]*$/;
+const text = z.string().trim().min(1).max(200).regex(noControlChars, 'must not contain control characters');
 const pagination = {
   limit: integer.pipe(z.number().positive()).default(String(config.pagination.defaultLimit)).transform(n => Math.min(n, config.pagination.maxLimit)),
   offset: integer.pipe(z.number().max(2147483647)).default('0'),
@@ -15,7 +16,7 @@ const pagination = {
 export const querySchemas = {
   freelancers: z.object({ ...pagination, sort: z.enum(['createdAt', 'name', 'rating', 'hourlyRateMinor']).default('createdAt'), skill: text.optional(), minRating: z.string().regex(/^\d+(\.\d+)?$/).transform(Number).pipe(z.number().min(0).max(5)).optional() }).strict(),
   clients: z.object({ ...pagination, sort: z.enum(['createdAt', 'name']).default('createdAt'), name: text.optional(), email: z.string().email().optional() }).strict(),
-  gigs: z.object({ ...pagination, sort: z.enum(['createdAt', 'title', 'priceMinor', 'deliveryDays']).default('createdAt'), category: text.optional(), search: z.string().trim().min(1).max(100).optional(), minPrice: integer.pipe(z.number().max(2147483647)).optional(), maxPrice: integer.pipe(z.number().max(2147483647)).optional() }).strict().refine(q => q.minPrice === undefined || q.maxPrice === undefined || q.minPrice <= q.maxPrice, { path: ['maxPrice'], message: 'maxPrice must be greater than or equal to minPrice' }),
+  gigs: z.object({ ...pagination, sort: z.enum(['createdAt', 'title', 'priceMinor', 'deliveryDays']).default('createdAt'), category: text.optional(), search: z.string().trim().min(1).max(100).regex(noControlChars, 'must not contain control characters').optional(), minPrice: integer.pipe(z.number().max(2147483647)).optional(), maxPrice: integer.pipe(z.number().max(2147483647)).optional() }).strict().refine(q => q.minPrice === undefined || q.maxPrice === undefined || q.minPrice <= q.maxPrice, { path: ['maxPrice'], message: 'maxPrice must be greater than or equal to minPrice' }),
   orders: z.object({ ...pagination, sort: z.enum(['createdAt', 'priceMinor', 'status']).default('createdAt'), status: z.enum(['pending', 'in_progress', 'delivered', 'completed', 'cancelled']).optional(), clientId: idSchema.optional(), gigId: idSchema.optional() }).strict(),
   reviews: z.object({ ...pagination, sort: z.enum(['createdAt', 'rating']).default('createdAt'), orderId: idSchema.optional(), rating: integer.pipe(z.number().min(1).max(5)).optional() }).strict(),
 };

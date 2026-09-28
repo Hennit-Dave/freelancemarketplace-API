@@ -150,3 +150,17 @@ test('gig search escapes LIKE wildcards so they match literally', async () => {
   const { findWhere: mixed } = await listGigs({ search: 'a_b\\c' }, [], 0);
   assert.deepEqual(mixed?.OR, searchClause('a\\_b\\\\c'));
 });
+test('control characters in search or category are rejected with 400 BAD_REQUEST before reaching Prisma', async () => {
+  const find = replaceMethod(prisma.gig, 'findMany', () => Promise.resolve([]));
+  const count = replaceMethod(prisma.gig, 'count', () => Promise.resolve(0));
+  try {
+    for (const search of ['\u0000', 'abc\u0000def']) {
+      assert.throws(() => parse(querySchemas.gigs, { search }), (e: unknown) => e instanceof ApiError && e.status === 400 && e.code === 'BAD_REQUEST' && e.message.startsWith('search:'));
+      await assert.rejects(listResource('gigs', { search }), (e: unknown) => e instanceof ApiError && e.status === 400 && e.code === 'BAD_REQUEST');
+    }
+    assert.throws(() => parse(querySchemas.gigs, { category: '\u0000' }), (e: unknown) => e instanceof ApiError && e.status === 400 && e.code === 'BAD_REQUEST' && e.message.startsWith('category:'));
+    await assert.rejects(listResource('gigs', { category: '\u0000' }), (e: unknown) => e instanceof ApiError && e.status === 400 && e.code === 'BAD_REQUEST');
+    assert.equal(find.replacement.mock.calls.length, 0);
+    assert.equal(count.replacement.mock.calls.length, 0);
+  } finally { find.restore(); count.restore(); }
+});
